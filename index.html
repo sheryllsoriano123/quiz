@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DNA Explorer — Science Puzzle Game</title>
+<style>
+/* ============================================================
+   TEACHER SETTINGS — Colors / Fonts / Sizes
+   Edit these CSS variables to change the look of the game!
+   ============================================================ */
+:root {
+  --bg:        #0a0e1a;
+  --panel:     #111827;
+  --card:      #1c2333;
+  --border:    #2a3550;
+  --accent1:   #00d4ff;   /* cyan   */
+  --accent2:   #ff6b9d;   /* pink   */
+  --accent3:   #a8ff3e;   /* lime   */
+  --accent4:   #ffcc00;   /* gold   */
+  --accent5:   #ff7b54;   /* orange */
+  --text:      #e8f0ff;
+  --muted:     #6b7fa8;
+  --radius:    14px;
+  --shadow:    0 8px 32px rgba(0,0,0,0.5);
+  --font-head: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --font-body: 'Courier New', monospace;
+}
+
+/* ============================================================
+   BASE RESET
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow-x: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ============================================================
+   DNA HELIX BACKGROUND ANIMATION
+   ============================================================ */
+#dna-bg {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.helix-dot {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.18;
+  animation: floatDot linear infinite;
+}
+@keyframes floatDot {
+  0%   { transform: translateY(100vh) scale(0.5); opacity: 0; }
+  10%  { opacity: 0.18; }
+  90%  { opacity: 0.18; }
+  100% { transform: translateY(-120px) scale(1.2); opacity: 0; }
+}
+
+/* ============================================================
+   SCREENS WRAPPER
+   ============================================================ */
+#app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px 40px;
+}
+
+/* ============================================================
+   SCREEN VISIBILITY
+   ============================================================ */
+.screen { display: none; width: 100%; max-width: 860px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ============================================================
+   START SCREEN
+   ============================================================ */
+#start-screen { text-align: center; padding-top: 40px; }
+.game-logo {
+  font-family: var(--font-head);
+  font-size: clamp(2.2rem, 8vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2), var(--accent3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+.game-subtitle {
+  color: var(--muted);
+  font-size: 1rem;
+  margin-bottom: 36px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.dna-icon-anim {
+  font-size: 5rem;
+  display: block;
+  margin: 0 auto 28px;
+  animation: spinY 4s ease-in-out infinite;
+}
+@keyframes spinY {
+  0%, 100% { transform: rotateY(0deg) scale(1); }
+  50%       { transform: rotateY(180deg) scale(1.1); }
+}
+.level-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto 32px;
+  max-width: 600px;
+}
+.level-badge {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 50px;
+  padding: 8px 18px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  transition: all 0.3s;
+}
+.level-badge:hover { border-color: var(--accent1); color: var(--accent1); }
+.btn-group { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 30px;
+  border: none; border-radius: 50px;
+  font-family: var(--font-head);
+  font-size: 1rem; font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+  letter-spacing: 0.5px;
+}
+.btn:hover  { transform: translateY(-2px); filter: brightness(1.1); }
+.btn:active { transform: translateY(0px);  filter: brightness(0.95); }
+.btn-primary   { background: linear-gradient(135deg, var(--accent1), #0066ff); color: #fff; box-shadow: 0 4px 20px rgba(0,212,255,0.35); }
+.btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+.btn-success   { background: linear-gradient(135deg, var(--accent3), #00cc44); color: #000; box-shadow: 0 4px 20px rgba(168,255,62,0.35); }
+.btn-danger    { background: linear-gradient(135deg, var(--accent2), #cc0055); color: #fff; }
+.btn-gold      { background: linear-gradient(135deg, var(--accent4), var(--accent5)); color: #000; box-shadow: 0 4px 20px rgba(255,204,0,0.4); }
+.btn-sm { padding: 8px 18px; font-size: 0.85rem; }
+
+/* ============================================================
+   MODAL (Instructions, Pause, Completion)
+   ============================================================ */
+.modal-overlay {
+  display: none; position: fixed;
+  inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 520px; width: 100%;
+  box-shadow: var(--shadow);
+  animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes popIn {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.modal-box h2 {
+  font-family: var(--font-head);
+  font-size: 1.6rem;
+  margin-bottom: 16px;
+  color: var(--accent1);
+}
+.modal-box p, .modal-box li { line-height: 1.7; color: var(--text); margin-bottom: 8px; }
+.modal-box ul { padding-left: 18px; }
+.modal-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+/* ============================================================
+   GAME HUD (header bar during gameplay)
+   ============================================================ */
+#game-hud {
+  width: 100%; max-width: 860px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+}
+#game-hud.visible { display: flex; }
+.hud-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hud-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.hud-value { font-family: var(--font-head); font-size: 1.15rem; font-weight: 700; }
+.hud-score  { color: var(--accent4); }
+.hud-timer  { color: var(--accent2); }
+.hud-level  { color: var(--accent1); }
+.hud-lives  { color: var(--accent3); }
+
+/* PROGRESS BAR */
+#progress-bar-wrap {
+  width: 100%; height: 8px;
+  background: var(--card);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  max-width: 860px;
+  display: none;
+}
+#progress-bar-wrap.visible { display: block; }
+#progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  border-radius: 20px;
+  transition: width 0.6s ease;
+  width: 0%;
+}
+
+/* HUD Controls */
+.hud-controls { display: flex; gap: 8px; }
+.icon-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 1.1rem;
+  transition: all 0.2s;
+}
+.icon-btn:hover { border-color: var(--accent1); background: #1a2540; }
+
+/* ============================================================
+   GAME BOARD
+   ============================================================ */
+#game-screen { width: 100%; max-width: 860px; }
+.level-title {
+  font-family: var(--font-head);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent1);
+  margin-bottom: 6px;
+  text-align: center;
+}
+.level-instruction {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.hint-box {
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 0.85rem;
+  color: var(--accent1);
+  margin-bottom: 16px;
+  display: none;
+}
+.hint-box.show { display: block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ============================================================
+   DRAG SOURCE ZONE
+   ============================================================ */
+.drag-zone {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 70px;
+  justify-content: center;
+}
+.drag-zone-label {
+  width: 100%;
+  text-align: center;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   DRAGGABLE CARD
+   ============================================================ */
+.dna-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  height: 54px;
+  padding: 6px 16px;
+  border-radius: 10px;
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: grab;
+  user-select: none;
+  border: 2px solid transparent;
+  transition: transform 0.18s, box-shadow 0.18s, opacity 0.18s;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+}
+.dna-card:hover  { transform: translateY(-3px) scale(1.07); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
+.dna-card.dragging { opacity: 0.35; transform: scale(0.95); cursor: grabbing; }
+.dna-card.placed   { opacity: 0.4; pointer-events: none; }
+
+/* Base colours */
+.base-A { background: linear-gradient(135deg,#ff4e7a,#cc003a); color:#fff; }
+.base-T { background: linear-gradient(135deg,#00d4ff,#0055cc); color:#fff; }
+.base-G { background: linear-gradient(135deg,#a8ff3e,#33aa00); color:#000; }
+.base-C { background: linear-gradient(135deg,#ffcc00,#ff8800); color:#000; }
+.base-U { background: linear-gradient(135deg,#cc88ff,#7700cc); color:#fff; }
+.base-neutral { background: linear-gradient(135deg,#3a4a70,#1c2333); color:#fff; }
+
+/* ============================================================
+   DROP SLOTS
+   ============================================================ */
+.drop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.drop-slot {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 64px; height: 54px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 2px dashed var(--border);
+  background: rgba(255,255,255,0.03);
+  font-family: var(--font-head);
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.25s;
+  position: relative;
+}
+.drop-slot.drag-over {
+  border-color: var(--accent1);
+  background: rgba(0,212,255,0.1);
+  transform: scale(1.08);
+}
+.drop-slot.correct {
+  border-color: var(--accent3) !important;
+  background: rgba(168,255,62,0.12) !important;
+  animation: correctPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.drop-slot.incorrect {
+  border-color: var(--accent2) !important;
+  background: rgba(255,107,157,0.12) !important;
+  animation: shakeBad 0.4s ease;
+}
+@keyframes correctPop {
+  0%   { transform: scale(1);   }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1);   }
+}
+@keyframes shakeBad {
+  0%,100% { transform: translateX(0);    }
+  25%     { transform: translateX(-6px); }
+  75%     { transform: translateX(6px);  }
+}
+
+/* ============================================================
+   LEVEL 1 — BASE PAIR MATCHING (Grid Layout)
+   ============================================================ */
+.pair-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+.pair-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.pair-card-label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); }
+.pair-slot {
+  display: flex; align-items: center; justify-content: center;
+  width: 80px; height: 54px;
+  border-radius: 10px;
+  border: 2px dashed var(--border);
+  background: rgba(255,255,255,0.03);
+  font-family: var(--font-head);
+  font-size: 1.1rem; font-weight: 800;
+  transition: all 0.25s;
+}
+
+/* ============================================================
+   LEVEL 3 — DNA STRUCTURE LABELING
+   ============================================================ */
+.dna-svg-wrap {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto 20px;
+  position: relative;
+}
+.dna-label-target {
+  position: absolute;
+  width: 130px; height: 40px;
+  border-radius: 8px;
+  border: 2px dashed var(--border);
+  background: rgba(255,255,255,0.04);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.25s;
+  cursor: default;
+}
+.dna-label-target.drag-over {
+  border-color: var(--accent1);
+  background: rgba(0,212,255,0.15);
+}
+
+/* ============================================================
+   LEVEL 4 — REPLICATION SEQUENCE
+   ============================================================ */
+.seq-zone {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  min-height: 80px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.seq-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: grab;
+  user-select: none;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.seq-card .step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent1);
+  color: #000;
+  font-weight: 800; font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.seq-card:hover { transform: translateY(-2px); border-color: var(--accent1); }
+.seq-card.dragging { opacity: 0.3; }
+
+.order-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.order-slot {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-height: 52px;
+  transition: all 0.25s;
+  font-size: 0.85rem; color: var(--muted);
+}
+.order-slot.drag-over { border-color: var(--accent1); background: rgba(0,212,255,0.08); }
+.order-slot.filled-correct { border-color: var(--accent3); background: rgba(168,255,62,0.08); color: var(--text); }
+.order-slot.filled-wrong   { border-color: var(--accent2); background: rgba(255,107,157,0.08); color: var(--text); }
+.slot-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--border);
+  font-weight: 800; font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--muted);
+}
+
+/* ============================================================
+   LEVEL 5 — CODON CHALLENGE
+   ============================================================ */
+.codon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+.codon-target-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.amino-name {
+  font-family: var(--font-head);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent4);
+}
+.amino-abbr {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.codon-slot {
+  width: 100%; min-height: 48px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.03);
+  font-family: var(--font-head);
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.25s;
+  letter-spacing: 2px;
+}
+.codon-slot.drag-over { border-color: var(--accent1); background: rgba(0,212,255,0.1); }
+.codon-card {
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 18px; min-width: 80px; height: 48px;
+  background: linear-gradient(135deg,#1a2a4a,#0d1626);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font-head);
+  font-size: 1rem; font-weight: 800;
+  letter-spacing: 2px;
+  cursor: grab;
+  color: var(--accent1);
+  transition: all 0.2s;
+}
+.codon-card:hover { transform: translateY(-3px); border-color: var(--accent1); }
+
+/* ============================================================
+   CHECK BUTTON SECTION
+   ============================================================ */
+.action-row {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 24px;
+}
+.feedback-msg {
+  text-align: center;
+  margin-top: 16px;
+  font-family: var(--font-head);
+  font-size: 1.1rem;
+  font-weight: 700;
+  min-height: 28px;
+  transition: all 0.3s;
+}
+.feedback-msg.good { color: var(--accent3); }
+.feedback-msg.bad  { color: var(--accent2); }
+
+/* ============================================================
+   CONFETTI
+   ============================================================ */
+.confetti-piece {
+  position: fixed;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 9999;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg) scaleX(1);   opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg) scaleX(-1); opacity: 0; }
+}
+
+/* ============================================================
+   LEVEL COMPLETE / FINAL SCREENS
+   ============================================================ */
+#level-complete-modal .modal-box {
+  text-align: center;
+  border-color: var(--accent3);
+  box-shadow: 0 0 60px rgba(168,255,62,0.2);
+}
+#level-complete-modal .big-emoji { font-size: 4rem; display: block; margin-bottom: 12px; animation: bounceEmoji 0.8s ease infinite alternate; }
+@keyframes bounceEmoji { from { transform: scale(1); } to { transform: scale(1.18); } }
+#level-complete-modal .score-chip {
+  display: inline-flex; gap: 6px; align-items: center;
+  background: rgba(168,255,62,0.1);
+  border: 1px solid var(--accent3);
+  border-radius: 50px;
+  padding: 8px 20px;
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--accent3);
+  margin: 12px 0;
+}
+
+/* ============================================================
+   FINAL CERTIFICATE SCREEN
+   ============================================================ */
+#cert-screen {
+  text-align: center;
+}
+.certificate {
+  background: linear-gradient(145deg,#0d1626,#111e3a);
+  border: 3px solid var(--accent4);
+  border-radius: 20px;
+  padding: 40px 32px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 0 80px rgba(255,204,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+.certificate::before {
+  content: '';
+  position: absolute; inset: 8px;
+  border: 1px solid rgba(255,204,0,0.2);
+  border-radius: 14px;
+  pointer-events: none;
+}
+.cert-title {
+  font-family: var(--font-head);
+  font-size: 1.8rem; font-weight: 900;
+  background: linear-gradient(135deg,var(--accent4),var(--accent5));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+.cert-subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+.cert-name {
+  font-family: var(--font-head);
+  font-size: 2rem; font-weight: 900;
+  color: var(--text);
+  border-bottom: 2px solid var(--accent4);
+  display: inline-block; padding: 4px 20px;
+  margin-bottom: 16px;
+}
+.cert-score-big {
+  font-family: var(--font-head);
+  font-size: 3rem; font-weight: 900;
+  color: var(--accent3);
+}
+.cert-badges {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 16px 0;
+}
+.badge {
+  background: rgba(255,204,0,0.1);
+  border: 1px solid var(--accent4);
+  border-radius: 50px;
+  padding: 6px 16px;
+  font-size: 0.78rem;
+  color: var(--accent4);
+}
+
+/* ============================================================
+   LEADERBOARD
+   ============================================================ */
+#leaderboard-screen { width: 100%; max-width: 600px; }
+.lb-title {
+  font-family: var(--font-head);
+  font-size: 1.6rem; font-weight: 800;
+  color: var(--accent4);
+  text-align: center;
+  margin-bottom: 20px;
+}
+.lb-table {
+  width: 100%; border-collapse: collapse;
+}
+.lb-table th {
+  background: var(--card);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+}
+.lb-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.lb-table tr:hover td { background: rgba(255,255,255,0.03); }
+.lb-rank-1 { color: var(--accent4); font-weight: 800; }
+.lb-rank-2 { color: #c0c0c0; font-weight: 700; }
+.lb-rank-3 { color: #cd7f32; font-weight: 700; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 600px) {
+  .pair-grid { grid-template-columns: 1fr 1fr; }
+  .codon-grid { grid-template-columns: 1fr; }
+  #game-hud { flex-direction: row; gap: 6px; }
+  .hud-value { font-size: 1rem; }
+}
+
+/* ============================================================
+   MISC UTILITIES
+   ============================================================ */
+.sep { width: 60px; height: 3px; background: linear-gradient(90deg,var(--accent1),var(--accent2)); border-radius: 4px; margin: 12px auto 20px; }
+.text-center { text-align: center; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+strong { color: var(--accent1); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     DNA BACKGROUND PARTICLES
+     ============================================================ -->
+<div id="dna-bg"></div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div id="app">
+
+  <!-- ==================== START SCREEN ==================== -->
+  <div id="start-screen" class="screen active">
+    <span class="dna-icon-anim">🧬</span>
+    <div class="game-logo">DNA Explorer</div>
+    <div class="game-subtitle">Interactive Science Puzzle Game</div>
+    <div class="sep"></div>
+    <div class="level-list">
+      <div class="level-badge">🔬 Level 1 — Base Pair Matching</div>
+      <div class="level-badge">🧩 Level 2 — Build the Strand</div>
+      <div class="level-badge">🏷️ Level 3 — DNA Labeling</div>
+      <div class="level-badge">🔄 Level 4 — Replication Steps</div>
+      <div class="level-badge">🧪 Level 5 — Genetic Code</div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="showInstructions()">📖 How to Play</button>
+      <button class="btn btn-success" onclick="askNameAndStart()">▶ Start Game</button>
+      <button class="btn btn-secondary btn-sm" onclick="showLeaderboard()">🏆 Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- ==================== PROGRESS BAR ==================== -->
+  <div id="progress-bar-wrap">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- ==================== GAME HUD ==================== -->
+  <div id="game-hud">
+    <div class="hud-cell">
+      <span class="hud-label">Level</span>
+      <span class="hud-value hud-level" id="hud-level">1/5</span>
+    </div>
+    <div class="hud-cell">
+      <span class="hud-label">Score</span>
+      <span class="hud-value hud-score" id="hud-score">0</span>
+    </div>
+    <div class="hud-cell">
+      <span class="hud-label">Time</span>
+      <span class="hud-value hud-timer" id="hud-timer">60</span>
+    </div>
+    <div class="hud-cell">
+      <span class="hud-label">Hints</span>
+      <span class="hud-value hud-lives" id="hud-hints">3</span>
+    </div>
+    <div class="hud-controls">
+      <div class="icon-btn" onclick="useHint()" title="Use Hint">💡</div>
+      <div class="icon-btn" onclick="togglePause()" title="Pause" id="pause-btn">⏸</div>
+      <div class="icon-btn" onclick="toggleSound()" title="Sound" id="sound-btn">🔊</div>
+    </div>
+  </div>
+
+  <!-- ==================== GAME SCREEN ==================== -->
+  <div id="game-screen" class="screen">
+    <div class="level-title" id="level-title"></div>
+    <div class="level-instruction" id="level-instruction"></div>
+    <div class="hint-box" id="hint-box">💡 <span id="hint-text"></span></div>
+    <div id="game-content"></div>
+    <div class="feedback-msg" id="feedback-msg"></div>
+    <div class="action-row">
+      <button class="btn btn-primary" id="check-btn" onclick="checkAnswer()">✔ Check Answer</button>
+      <button class="btn btn-secondary btn-sm" onclick="resetLevel()">🔁 Reset Level</button>
+    </div>
+  </div>
+
+  <!-- ==================== LEADERBOARD SCREEN ==================== -->
+  <div id="leaderboard-screen" class="screen">
+    <div class="lb-title">🏆 Leaderboard</div>
+    <table class="lb-table" id="lb-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Score</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <div class="action-row">
+      <button class="btn btn-secondary" onclick="goHome()">← Back</button>
+      <button class="btn btn-danger btn-sm" onclick="clearLeaderboard()">🗑 Clear</button>
+    </div>
+  </div>
+
+  <!-- ==================== CERTIFICATE SCREEN ==================== -->
+  <div id="cert-screen" class="screen">
+    <div class="certificate">
+      <div style="font-size:3rem;margin-bottom:12px;">🎓</div>
+      <div class="cert-title">Certificate of Achievement</div>
+      <div class="cert-subtitle">This certifies that</div>
+      <div class="cert-name" id="cert-name">Student</div>
+      <div class="cert-subtitle">has successfully completed</div>
+      <div style="font-family:var(--font-head);font-size:1.2rem;color:var(--accent1);margin:8px 0;">DNA Explorer — All 5 Levels</div>
+      <div class="cert-score-big" id="cert-score">0</div>
+      <div style="color:var(--muted);font-size:0.8rem;margin-top:4px;">Total Score</div>
+      <div class="cert-badges" id="cert-badges"></div>
+      <div style="color:var(--muted);font-size:0.78rem;margin-top:12px;" id="cert-date"></div>
+    </div>
+    <div class="action-row mt-24">
+      <button class="btn btn-gold" onclick="printCertificate()">🖨 Print Certificate</button>
+      <button class="btn btn-primary" onclick="goHome()">🏠 Play Again</button>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- ============================================================
+     MODALS
+     ============================================================ -->
+
+<!-- Instructions -->
+<div class="modal-overlay" id="instructions-modal">
+  <div class="modal-box">
+    <h2>📖 How to Play</h2>
+    <ul>
+      <li>The game has <strong>5 levels</strong> about DNA biology.</li>
+      <li>In each level, <strong>drag and drop</strong> items to the correct spots.</li>
+      <li>You have a <strong>timer</strong> per level — complete before time runs out!</li>
+      <li>Use <strong>💡 hints</strong> (3 available) if you're stuck.</li>
+      <li>Click <strong>✔ Check Answer</strong> to submit your answer.</li>
+      <li>Earn bonus points for speed and accuracy!</li>
+      <li>Complete all 5 levels to earn your <strong>certificate</strong>. 🎓</li>
+    </ul>
+    <div style="margin-top:12px;padding:10px;background:rgba(0,212,255,0.07);border-radius:8px;font-size:0.82rem;color:var(--muted);">
+      <strong>Touch devices:</strong> Tap items and then tap a slot to place them.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('instructions-modal')">Got it! 👍</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div class="modal-overlay" id="pause-modal">
+  <div class="modal-box" style="text-align:center;">
+    <h2>⏸ Game Paused</h2>
+    <p>Take a breath! The timer is stopped.</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="resumeGame()">▶ Resume</button>
+      <button class="btn btn-secondary" onclick="confirmQuit()">🚪 Quit to Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Level Complete -->
+<div class="modal-overlay" id="level-complete-modal">
+  <div class="modal-box">
+    <span class="big-emoji" id="complete-emoji">🎉</span>
+    <h2 id="complete-title">Level Complete!</h2>
+    <p id="complete-msg">Great job! You matched all DNA base pairs correctly.</p>
+    <div class="score-chip">⭐ <span id="complete-score">+100</span> points earned</div>
+    <div class="modal-actions">
+      <button class="btn btn-success" id="next-level-btn" onclick="nextLevel()">Next Level →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Name Entry -->
+<div class="modal-overlay" id="name-modal">
+  <div class="modal-box" style="text-align:center;">
+    <h2>👤 Enter Your Name</h2>
+    <p>Your name will appear on the leaderboard and certificate.</p>
+    <input type="text" id="player-name-input"
+      style="width:100%;padding:12px;margin:16px 0;background:var(--card);border:1px solid var(--border);
+             border-radius:10px;color:var(--text);font-size:1rem;font-family:var(--font-head);outline:none;"
+      placeholder="e.g. Maria" maxlength="24" />
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="startGameWithName()">▶ Start!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ================= TEACHER SETTINGS =================
+   Edit this section to customise the game content,
+   timing, scoring, and difficulty!
+   ============================================================ */
+const TEACHER = {
+
+  // ── TIMER (seconds per level) ──────────────────────────────
+  timers: [90, 90, 90, 90, 120],   // [Level1, Level2, Level3, Level4, Level5]
+
+  // ── SCORING ───────────────────────────────────────────────
+  pointsPerCorrect:  20,    // points for each correct placement
+  bonusTimePoints:   0.5,   // points multiplier for remaining seconds
+  hintPenalty:       10,    // points deducted per hint used
+  passingScore:      60,    // % correct needed to advance (not enforced strictly)
+
+  // ── HINTS (shown when player clicks the hint button) ──────
+  hints: [
+    "Adenine (A) always pairs with Thymine (T). Cytosine (C) always pairs with Guanine (G).",
+    "Read the given strand left to right. Write the complement: A→T, T→A, G→C, C→G.",
+    "The backbone of DNA is made of alternating Sugar and Phosphate groups. Bases attach to the sugar.",
+    "DNA replication begins with unwinding, then bases pair, then new strands are synthesised.",
+    "AUG codes for Methionine (Met), the START codon! Use the codon table to match others."
+  ],
+
+  // ── LEVEL 1 — BASE PAIR MATCHING ──────────────────────────
+  level1: {
+    title: "Level 1 — Base Pair Matching",
+    instruction: "Drag each DNA base to its correct complementary partner on the right.",
+    pairs: [
+      { base: "A", partner: "T" },
+      { base: "T", partner: "A" },
+      { base: "G", partner: "C" },
+      { base: "C", partner: "G" },
+    ],
+    shuffle: true,  // randomise positions
+  },
+
+  // ── LEVEL 2 — BUILD THE DNA STRAND ────────────────────────
+  level2: {
+    title: "Level 2 — Build the DNA Strand",
+    instruction: "A DNA template strand is shown. Drag the missing complementary bases into the empty slots below.",
+    templateStrand: ["A","T","G","C","T","A","G","C"],
+    // How many bases to hide (counted from the right)
+    hiddenCount: 8,   // hide all — students complete entire complementary strand
+  },
+
+  // ── LEVEL 3 — DNA STRUCTURE LABELING ──────────────────────
+  level3: {
+    title: "Level 3 — DNA Structure Labeling",
+    instruction: "Drag the correct labels to the indicated parts of the DNA diagram.",
+    labels: [
+      { id: "phosphate",   text: "Phosphate",     hint_arrow: "top-left"    },
+      { id: "sugar",       text: "Deoxyribose Sugar", hint_arrow: "center-left" },
+      { id: "base",        text: "Nitrogen Base", hint_arrow: "center"      },
+      { id: "helix",       text: "Double Helix",  hint_arrow: "right"       },
+    ],
+  },
+
+  // ── LEVEL 4 — REPLICATION SEQUENCE ────────────────────────
+  level4: {
+    title: "Level 4 — DNA Replication Sequence",
+    instruction: "Arrange the steps of DNA replication in the correct order by dragging them into the numbered slots.",
+    steps: [
+      "Helicase unwinds the DNA double helix",
+      "Hydrogen bonds between base pairs break",
+      "Each strand acts as a template",
+      "DNA polymerase adds complementary bases",
+      "New complementary strands are synthesised",
+      "Two identical DNA molecules are formed",
+    ],
+    // correct order index (0-based), already in correct order above
+  },
+
+  // ── LEVEL 5 — CODON CHALLENGE ─────────────────────────────
+  level5: {
+    title: "Level 5 — Genetic Code Challenge",
+    instruction: "Drag each mRNA codon to match the correct amino acid it encodes. Bonus points for finishing quickly!",
+    pairs: [
+      { codon: "AUG", amino: "Methionine",  abbr: "Met", note: "START codon" },
+      { codon: "UUU", amino: "Phenylalanine", abbr: "Phe", note: "" },
+      { codon: "GGG", amino: "Glycine",     abbr: "Gly", note: "" },
+      { codon: "UAA", amino: "STOP",        abbr: "—",   note: "Terminates translation" },
+      { codon: "GAA", amino: "Glutamic Acid", abbr: "Glu", note: "" },
+      { codon: "CCU", amino: "Proline",     abbr: "Pro", note: "" },
+    ],
+    shuffle: true,
+    bonusMultiplier: 2,
+  },
+
+  // ── SOUND ─────────────────────────────────────────────────
+  soundEnabled: true,
+
+  // ── COLOURS (overrides CSS variables) ────────────────────
+  // Set to null to use defaults
+  customColors: null,
+  // Example: { accent1: '#ff0066', accent2: '#00ffcc' }
+};
+/* ============================================================
+   =============== END TEACHER SETTINGS =================
+   ============================================================ */
+
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const STATE = {
+  playerName: "Student",
+  level: 1,
+  score: 0,
+  timerVal: 0,
+  timerInterval: null,
+  hintsLeft: 3,
+  paused: false,
+  soundOn: TEACHER.soundEnabled,
+  levelAnswers: {},   // stores drag results
+  completedLevels: [],
+};
+
+
+/* ============================================================
+   AUDIO (simple Web Audio beeps — no files needed)
+   ============================================================ */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playTone(freq, duration, type = 'sine', gain = 0.3) {
+  if (!STATE.soundOn) return;
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gain, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(); osc.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+function sfxCorrect()  { playTone(523,0.1); setTimeout(()=>playTone(659,0.1),80); setTimeout(()=>playTone(784,0.2),160); }
+function sfxWrong()    { playTone(200,0.3,'sawtooth',0.2); }
+function sfxDrop()     { playTone(440,0.08,'square',0.15); }
+function sfxLevelUp()  { [523,587,659,698,784].forEach((f,i)=>setTimeout(()=>playTone(f,0.15),i*80)); }
+function sfxTick()     { playTone(880,0.05,'square',0.08); }
+
+
+/* ============================================================
+   DNA BACKGROUND ANIMATION
+   ============================================================ */
+(function buildBg() {
+  const bg = document.getElementById('dna-bg');
+  const colors = ['#00d4ff','#ff6b9d','#a8ff3e','#ffcc00','#cc88ff'];
+  for (let i = 0; i < 30; i++) {
+    const d = document.createElement('div');
+    d.className = 'helix-dot';
+    const size = 6 + Math.random() * 14;
+    d.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[i%colors.length]};
+      animation-duration:${8+Math.random()*14}s;
+      animation-delay:${-Math.random()*15}s;
+    `;
+    bg.appendChild(d);
+  }
+})();
+
+
+/* ============================================================
+   SCREEN NAVIGATION
+   ============================================================ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+function showModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showInstructions() { showModal('instructions-modal'); }
+function goHome() {
+  stopTimer();
+  document.getElementById('game-hud').classList.remove('visible');
+  document.getElementById('progress-bar-wrap').classList.remove('visible');
+  showScreen('start-screen');
+  STATE.level = 1; STATE.score = 0;
+}
+
+
+/* ============================================================
+   NAME + START
+   ============================================================ */
+function askNameAndStart() { showModal('name-modal'); setTimeout(()=>document.getElementById('player-name-input').focus(),300); }
+function startGameWithName() {
+  const n = document.getElementById('player-name-input').value.trim();
+  STATE.playerName = n || "DNA Explorer";
+  closeModal('name-modal');
+  STATE.level = 1; STATE.score = 0; STATE.hintsLeft = 3;
+  startLevel(1);
+}
+
+
+/* ============================================================
+   TIMER
+   ============================================================ */
+function startTimer(seconds) {
+  stopTimer();
+  STATE.timerVal = seconds;
+  updateTimerUI();
+  STATE.timerInterval = setInterval(() => {
+    if (STATE.paused) return;
+    STATE.timerVal--;
+    if (STATE.timerVal % 10 === 0) sfxTick();
+    updateTimerUI();
+    if (STATE.timerVal <= 0) { clearInterval(STATE.timerInterval); timeUp(); }
+  }, 1000);
+}
+function stopTimer() { clearInterval(STATE.timerInterval); }
+function updateTimerUI() {
+  const el = document.getElementById('hud-timer');
+  el.textContent = STATE.timerVal;
+  el.style.color = STATE.timerVal <= 15 ? 'var(--accent2)' : 'var(--accent4)';
+}
+function timeUp() {
+  setFeedback("⏰ Time's up! Try again.", 'bad');
+  sfxWrong();
+  setTimeout(resetLevel, 1200);
+}
+
+
+/* ============================================================
+   HUD
+   ============================================================ */
+function updateHUD() {
+  document.getElementById('hud-level').textContent = `${STATE.level}/5`;
+  document.getElementById('hud-score').textContent = STATE.score;
+  document.getElementById('hud-hints').textContent = STATE.hintsLeft;
+  document.getElementById('progress-bar').style.width = `${((STATE.level-1)/5)*100}%`;
+}
+function setFeedback(msg, type) {
+  const el = document.getElementById('feedback-msg');
+  el.textContent = msg;
+  el.className = 'feedback-msg ' + (type || '');
+}
+
+
+/* ============================================================
+   PAUSE / RESUME
+   ============================================================ */
+function togglePause() {
+  if (STATE.paused) { resumeGame(); return; }
+  STATE.paused = true;
+  document.getElementById('pause-btn').textContent = '▶';
+  showModal('pause-modal');
+}
+function resumeGame() {
+  STATE.paused = false;
+  document.getElementById('pause-btn').textContent = '⏸';
+  closeModal('pause-modal');
+}
+function confirmQuit() { closeModal('pause-modal'); goHome(); }
+
+
+/* ============================================================
+   SOUND TOGGLE
+   ============================================================ */
+function toggleSound() {
+  STATE.soundOn = !STATE.soundOn;
+  document.getElementById('sound-btn').textContent = STATE.soundOn ? '🔊' : '🔇';
+}
+
+
+/* ============================================================
+   HINTS
+   ============================================================ */
+function useHint() {
+  if (STATE.hintsLeft <= 0) { setFeedback("No hints left!", 'bad'); return; }
+  STATE.hintsLeft--;
+  STATE.score = Math.max(0, STATE.score - TEACHER.hintPenalty);
+  updateHUD();
+  const hintEl = document.getElementById('hint-box');
+  document.getElementById('hint-text').textContent = TEACHER.hints[STATE.level - 1] || "No hint available.";
+  hintEl.classList.add('show');
+  setTimeout(() => hintEl.classList.remove('show'), 7000);
+}
+
+
+/* ============================================================
+   LEVEL ENTRY POINT
+   ============================================================ */
+function startLevel(lvl) {
+  STATE.level = lvl;
+  STATE.paused = false;
+  STATE.levelAnswers = {};
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('hint-box').classList.remove('show');
+
+  // Show HUD
+  document.getElementById('game-hud').classList.add('visible');
+  document.getElementById('progress-bar-wrap').classList.add('visible');
+  updateHUD();
+
+  // Set level title / instruction
+  const cfg = [null, TEACHER.level1, TEACHER.level2, TEACHER.level3, TEACHER.level4, TEACHER.level5][lvl];
+  document.getElementById('level-title').textContent = cfg.title;
+  document.getElementById('level-instruction').textContent = cfg.instruction;
+
+  // Render game content
+  const content = document.getElementById('game-content');
+  content.innerHTML = '';
+  switch(lvl) {
+    case 1: renderLevel1(content); break;
+    case 2: renderLevel2(content); break;
+    case 3: renderLevel3(content); break;
+    case 4: renderLevel4(content); break;
+    case 5: renderLevel5(content); break;
+  }
+
+  showScreen('game-screen');
+  startTimer(TEACHER.timers[lvl - 1]);
+}
+
+
+/* ============================================================
+   DRAG-AND-DROP HELPERS
+   ============================================================ */
+let dragItem = null;
+let touchSelectedCard = null; // for touch
+
+function makeDraggable(el, data) {
+  el.setAttribute('draggable', 'true');
+  el.dataset.dndData = JSON.stringify(data);
+
+  el.addEventListener('dragstart', e => {
+    dragItem = data;
+    setTimeout(() => el.classList.add('dragging'), 0);
+    sfxDrop();
+  });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+
+  // Touch support
+  el.addEventListener('touchstart', e => {
+    touchSelectedCard = el;
+    el.style.boxShadow = '0 0 0 3px var(--accent1)';
+  }, { passive: true });
+}
+
+function makeDroppable(slot, onDrop) {
+  slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+  slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+  slot.addEventListener('drop', e => {
+    e.preventDefault();
+    slot.classList.remove('drag-over');
+    if (dragItem !== null) { onDrop(dragItem, slot); dragItem = null; }
+  });
+
+  // Touch: tap slot to place selected card
+  slot.addEventListener('touchend', e => {
+    if (touchSelectedCard) {
+      try { onDrop(JSON.parse(touchSelectedCard.dataset.dndData), slot); } catch(ex) {}
+      touchSelectedCard.style.boxShadow = '';
+      touchSelectedCard = null;
+    }
+  });
+}
+
+
+/* ============================================================
+   LEVEL 1 — BASE PAIR MATCHING
+   ============================================================ */
+function renderLevel1(container) {
+  const cfg = TEACHER.level1;
+  let pairs = [...cfg.pairs];
+  if (cfg.shuffle) pairs.sort(() => Math.random() - 0.5);
+
+  STATE.levelAnswers.level1 = {};
+
+  // Cards to drag
+  const dragZone = document.createElement('div');
+  dragZone.className = 'drag-zone';
+  dragZone.innerHTML = '<div class="drag-zone-label">Drag these bases →</div>';
+
+  const dragBases = [...pairs].sort(() => Math.random() - 0.5);
+  dragBases.forEach(p => {
+    const card = document.createElement('div');
+    card.className = `dna-card base-${p.base}`;
+    card.textContent = p.base;
+    card.id = `drag-base-${p.base}-${Math.random().toString(36).slice(2,6)}`;
+    makeDraggable(card, { base: p.base, cardId: card.id });
+    dragZone.appendChild(card);
+  });
+  container.appendChild(dragZone);
+
+  // Drop targets (pair cards)
+  const grid = document.createElement('div');
+  grid.className = 'pair-grid';
+
+  pairs.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'pair-card';
+    card.innerHTML = `
+      <div class="pair-card-label">Pairs with</div>
+      <div class="dna-card base-${p.partner}" style="pointer-events:none;">${p.partner}</div>
+      <div class="pair-card-label">Drop here</div>
+    `;
+    const slot = document.createElement('div');
+    slot.className = 'pair-slot';
+    slot.dataset.expectedBase = p.base;
+    slot.textContent = '?';
+
+    makeDroppable(slot, (data, s) => {
+      s.textContent = data.base;
+      s.dataset.dropped = data.base;
+      // visually mark the dragged card as placed
+      const orig = document.getElementById(data.cardId);
+      if (orig) orig.classList.add('placed');
+      sfxDrop();
+    });
+
+    card.appendChild(slot);
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+}
+
+function checkLevel1() {
+  const slots = document.querySelectorAll('.pair-slot');
+  let correct = 0;
+  slots.forEach(slot => {
+    const expected = slot.dataset.expectedBase;
+    const dropped  = slot.dataset.dropped || '';
+    if (dropped === expected) {
+      slot.classList.add('correct'); correct++;
+    } else {
+      slot.classList.add('incorrect');
+    }
+  });
+  return { correct, total: slots.length };
+}
+
+
+/* ============================================================
+   LEVEL 2 — BUILD THE DNA STRAND
+   ============================================================ */
+function renderLevel2(container) {
+  const cfg = TEACHER.level2;
+  const template = cfg.templateStrand;
+  const complement = { A:'T', T:'A', G:'C', C:'G' };
+
+  // Show template strand
+  const tRow = document.createElement('div');
+  tRow.className = 'drop-row';
+  tRow.style.marginBottom = '6px';
+  tRow.innerHTML = '<div style="width:100%;text-align:center;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;">Template Strand (5\'→3\')</div>';
+  template.forEach(b => {
+    const card = document.createElement('div');
+    card.className = `dna-card base-${b}`;
+    card.style.cursor = 'default';
+    card.textContent = b;
+    tRow.appendChild(card);
+  });
+  container.appendChild(tRow);
+
+  // Arrow separator
+  const arrow = document.createElement('div');
+  arrow.style.cssText = 'text-align:center;font-size:1.5rem;margin:8px 0;color:var(--muted);';
+  arrow.textContent = '↕ Complementary Strand';
+  container.appendChild(arrow);
+
+  // Drop slots row
+  const slotRow = document.createElement('div');
+  slotRow.className = 'drop-row';
+
+  // Draggable base pool (one of each needed base)
+  const needed = template.map(b => complement[b]);
+  const pool = [...new Set(needed)];
+
+  const dragZone = document.createElement('div');
+  dragZone.className = 'drag-zone';
+  dragZone.innerHTML = '<div class="drag-zone-label">Drag complementary bases →</div>';
+  dragZone.id = 'l2-drag-zone';
+
+  // Create multiple copies for repeated bases
+  const counts = {};
+  needed.forEach(b => counts[b] = (counts[b]||0) + 1);
+  Object.keys(counts).forEach(b => {
+    for (let i = 0; i < counts[b]; i++) {
+      const card = document.createElement('div');
+      card.className = `dna-card base-${b}`;
+      const uid = `l2card-${b}-${i}`;
+      card.id = uid;
+      card.textContent = b;
+      makeDraggable(card, { base: b, cardId: uid });
+      dragZone.appendChild(card);
+    }
+  });
+
+  template.forEach((b, idx) => {
+    const slot = document.createElement('div');
+    slot.className = 'drop-slot';
+    slot.dataset.expectedBase = complement[b];
+    slot.dataset.idx = idx;
+    slot.textContent = '?';
+    makeDroppable(slot, (data, s) => {
+      s.textContent = data.base;
+      s.dataset.dropped = data.base;
+      const orig = document.getElementById(data.cardId);
+      if (orig) orig.classList.add('placed');
+      sfxDrop();
+    });
+    slotRow.appendChild(slot);
+  });
+
+  container.appendChild(dragZone);
+  container.appendChild(slotRow);
+}
+
+function checkLevel2() {
+  const slots = document.querySelectorAll('.drop-slot');
+  let correct = 0;
+  slots.forEach(slot => {
+    const expected = slot.dataset.expectedBase;
+    const dropped  = slot.dataset.dropped || '';
+    if (dropped === expected) { slot.classList.add('correct'); correct++; }
+    else { slot.classList.add('incorrect'); }
+  });
+  return { correct, total: slots.length };
+}
+
+
+/* ============================================================
+   LEVEL 3 — DNA STRUCTURE LABELING
+   ============================================================ */
+function renderLevel3(container) {
+  const cfg = TEACHER.level3;
+
+  // SVG DNA Diagram
+  const svgWrap = document.createElement('div');
+  svgWrap.className = 'dna-svg-wrap';
+  svgWrap.style.cssText = 'position:relative; width:100%; max-width:440px; margin:0 auto 16px;';
+
+  svgWrap.innerHTML = `
+  <svg viewBox="0 0 300 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+    <defs>
+      <radialGradient id="gA" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ff6b9d"/>
+        <stop offset="100%" stop-color="#cc003a"/>
+      </radialGradient>
+      <radialGradient id="gT" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#00d4ff"/>
+        <stop offset="100%" stop-color="#0055cc"/>
+      </radialGradient>
+      <radialGradient id="gG" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#a8ff3e"/>
+        <stop offset="100%" stop-color="#33aa00"/>
+      </radialGradient>
+      <radialGradient id="gC" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffcc00"/>
+        <stop offset="100%" stop-color="#ff8800"/>
+      </radialGradient>
+    </defs>
+
+    <!-- Left backbone (phosphate-sugar) -->
+    <path d="M 60 20 Q 40 90 60 160 Q 80 230 60 300 Q 40 340 60 360" fill="none" stroke="#6b7fa8" stroke-width="4" stroke-linecap="round"/>
+    <!-- Right backbone -->
+    <path d="M 240 20 Q 260 90 240 160 Q 220 230 240 300 Q 260 340 240 360" fill="none" stroke="#6b7fa8" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Base pairs (horizontal rungs) -->
+    <!-- Pair 1 -->
+    <circle cx="70"  cy="55"  r="14" fill="url(#gA)"/>
+    <text x="70"  y="60"  text-anchor="middle" fill="white" font-size="11" font-weight="bold">A</text>
+    <line x1="84" y1="55" x2="216" y2="55" stroke="#3a4a70" stroke-width="3" stroke-dasharray="5,3"/>
+    <circle cx="230" cy="55"  r="14" fill="url(#gT)"/>
+    <text x="230" y="60"  text-anchor="middle" fill="white" font-size="11" font-weight="bold">T</text>
+
+    <!-- Pair 2 -->
+    <circle cx="60"  cy="110" r="14" fill="url(#gG)"/>
+    <text x="60"  y="115" text-anchor="middle" fill="#000" font-size="11" font-weight="bold">G</text>
+    <line x1="74" y1="110" x2="226" y2="110" stroke="#3a4a70" stroke-width="3" stroke-dasharray="5,3"/>
+    <circle cx="240" cy="110" r="14" fill="url(#gC)"/>
+    <text x="240" y="115" text-anchor="middle" fill="#000" font-size="11" font-weight="bold">C</text>
+
+    <!-- Pair 3 -->
+    <circle cx="75"  cy="165" r="14" fill="url(#gT)"/>
+    <text x="75"  y="170" text-anchor="middle" fill="white" font-size="11" font-weight="bold">T</text>
+    <line x1="89" y1="165" x2="211" y2="165" stroke="#3a4a70" stroke-width="3" stroke-dasharray="5,3"/>
+    <circle cx="225" cy="165" r="14" fill="url(#gA)"/>
+    <text x="225" y="170" text-anchor="middle" fill="white" font-size="11" font-weight="bold">A</text>
+
+    <!-- Pair 4 -->
+    <circle cx="65"  cy="220" r="14" fill="url(#gC)"/>
+    <text x="65"  y="225" text-anchor="middle" fill="#000" font-size="11" font-weight="bold">C</text>
+    <line x1="79" y1="220" x2="221" y2="220" stroke="#3a4a70" stroke-width="3" stroke-dasharray="5,3"/>
+    <circle cx="235" cy="220" r="14" fill="url(#gG)"/>
+    <text x="235" y="225" text-anchor="middle" fill="#000" font-size="11" font-weight="bold">G</text>
+
+    <!-- Pair 5 -->
+    <circle cx="62"  cy="275" r="14" fill="url(#gA)"/>
+    <text x="62"  y="280" text-anchor="middle" fill="white" font-size="11" font-weight="bold">A</text>
+    <line x1="76" y1="275" x2="224" y2="275" stroke="#3a4a70" stroke-width="3" stroke-dasharray="5,3"/>
+    <circle cx="238" cy="275" r="14" fill="url(#gT)"/>
+    <text x="238" y="280" text-anchor="middle" fill="white" font-size="11" font-weight="bold">T</text>
+
+    <!-- Arrow indicators -->
+    <!-- Phosphate indicator arrow (top left) -->
+    <line x1="60" y1="30" x2="20" y2="15" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <circle cx="17" cy="13" r="3" fill="#ffcc00"/>
+
+    <!-- Sugar indicator (center left) -->
+    <line x1="60" y1="140" x2="18" y2="140" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <circle cx="15" cy="140" r="3" fill="#ffcc00"/>
+
+    <!-- Base indicator (center) -->
+    <line x1="150" y1="165" x2="150" y2="195" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <circle cx="150" cy="198" r="3" fill="#ffcc00"/>
+
+    <!-- Helix indicator (right) -->
+    <line x1="240" y1="90" x2="282" y2="80" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <circle cx="285" cy="78" r="3" fill="#ffcc00"/>
+  </svg>
+
+  <!-- Label drop zones positioned over SVG -->
+  <div class="dna-label-target" data-label="phosphate"
+    style="top:0%; left:0%; transform:translate(-80%, -10%);">
+    <span id="lt-phosphate">?</span>
+  </div>
+  <div class="dna-label-target" data-label="sugar"
+    style="top:36%; left:-2%; transform:translate(-85%, -50%);">
+    <span id="lt-sugar">?</span>
+  </div>
+  <div class="dna-label-target" data-label="base"
+    style="top:54%; left:50%; transform:translate(-50%, 12%);">
+    <span id="lt-base">?</span>
+  </div>
+  <div class="dna-label-target" data-label="helix"
+    style="top:22%; right:-2%; transform:translate(82%, -50%);">
+    <span id="lt-helix">?</span>
+  </div>
+  `;
+
+  container.appendChild(svgWrap);
+
+  // Set up drop targets
+  svgWrap.querySelectorAll('.dna-label-target').forEach(target => {
+    const labelId = target.dataset.label;
+    makeDroppable(target, (data, slot) => {
+      slot.querySelector('span').textContent = data.text;
+      slot.dataset.dropped = data.labelId;
+      const orig = document.getElementById(data.cardId);
+      if (orig) orig.classList.add('placed');
+      sfxDrop();
+    });
+  });
+
+  // Draggable labels
+  const dragZone = document.createElement('div');
+  dragZone.className = 'drag-zone';
+  dragZone.innerHTML = '<div class="drag-zone-label">Drag labels to diagram →</div>';
+
+  const shuffled = [...cfg.labels].sort(() => Math.random() - 0.5);
+  shuffled.forEach(lbl => {
+    const card = document.createElement('div');
+    card.className = 'dna-card base-neutral';
+    card.style.fontSize = '0.78rem';
+    card.style.minWidth = '120px';
+    card.id = `lblcard-${lbl.id}`;
+    card.textContent = lbl.text;
+    makeDraggable(card, { labelId: lbl.id, text: lbl.text, cardId: card.id });
+    dragZone.appendChild(card);
+  });
+  container.appendChild(dragZone);
+}
+
+function checkLevel3() {
+  const targets = document.querySelectorAll('.dna-label-target');
+  let correct = 0;
+  targets.forEach(t => {
+    const expected = t.dataset.label;
+    const dropped  = t.dataset.dropped || '';
+    if (dropped === expected) { t.style.borderColor = 'var(--accent3)'; t.style.background = 'rgba(168,255,62,0.12)'; correct++; }
+    else { t.style.borderColor = 'var(--accent2)'; t.style.background = 'rgba(255,107,157,0.12)'; }
+  });
+  return { correct, total: targets.length };
+}
+
+
+/* ============================================================
+   LEVEL 4 — REPLICATION SEQUENCE
+   ============================================================ */
+function renderLevel4(container) {
+  const cfg = TEACHER.level4;
+  const steps = [...cfg.steps];
+  const shuffled = [...steps].sort(() => Math.random() - 0.5);
+
+  // Drag pool
+  const dragZone = document.createElement('div');
+  dragZone.className = 'seq-zone';
+  dragZone.innerHTML = '<div class="drag-zone-label" style="width:100%">Unordered Steps — Drag to correct position below</div>';
+
+  shuffled.forEach((step, i) => {
+    const card = document.createElement('div');
+    card.className = 'seq-card';
+    const uid = `seq-${i}`;
+    card.id = uid;
+    card.dataset.step = step;
+    card.innerHTML = `<span class="step-num">?</span><span>${step}</span>`;
+    makeDraggable(card, { step, cardId: uid });
+    dragZone.appendChild(card);
+  });
+  container.appendChild(dragZone);
+
+  // Order slots
+  const orderWrap = document.createElement('div');
+  orderWrap.className = 'order-slots';
+  orderWrap.innerHTML = '<div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;text-align:center;">Drop steps in correct order</div>';
+
+  steps.forEach((correctStep, idx) => {
+    const slot = document.createElement('div');
+    slot.className = 'order-slot';
+    slot.dataset.correctStep = correctStep;
+    slot.dataset.position = idx;
+    slot.innerHTML = `<span class="slot-num">${idx+1}</span><span class="slot-content">Drop step ${idx+1} here…</span>`;
+
+    makeDroppable(slot, (data, s) => {
+      s.querySelector('.slot-content').textContent = data.step;
+      s.dataset.dropped = data.step;
+      const orig = document.getElementById(data.cardId);
+      if (orig) orig.classList.add('placed');
+      sfxDrop();
+    });
+    orderWrap.appendChild(slot);
+  });
+  container.appendChild(orderWrap);
+}
+
+function checkLevel4() {
+  const slots = document.querySelectorAll('.order-slot');
+  let correct = 0;
+  slots.forEach(slot => {
+    const expected = slot.dataset.correctStep;
+    const dropped  = slot.dataset.dropped || '';
+    if (dropped === expected) {
+      slot.classList.add('filled-correct');
+      slot.querySelector('.slot-num').style.background = 'var(--accent3)';
+      slot.querySelector('.slot-num').style.color = '#000';
+      correct++;
+    } else if (dropped) {
+      slot.classList.add('filled-wrong');
+    }
+  });
+  return { correct, total: slots.length };
+}
+
+
+/* ============================================================
+   LEVEL 5 — CODON CHALLENGE
+   ============================================================ */
+function renderLevel5(container) {
+  const cfg = TEACHER.level5;
+  let pairs = [...cfg.pairs];
+  if (cfg.shuffle) pairs.sort(() => Math.random() - 0.5);
+
+  // Drag pool
+  const dragZone = document.createElement('div');
+  dragZone.className = 'drag-zone';
+  dragZone.innerHTML = '<div class="drag-zone-label">mRNA Codons — Drag to matching amino acid →</div>';
+
+  const shuffledCodons = [...pairs].sort(() => Math.random() - 0.5);
+  shuffledCodons.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'codon-card';
+    const uid = `codon-${p.codon}`;
+    card.id = uid;
+    card.textContent = p.codon;
+    makeDraggable(card, { codon: p.codon, cardId: uid });
+    dragZone.appendChild(card);
+  });
+  container.appendChild(dragZone);
+
+  // Amino acid targets
+  const grid = document.createElement('div');
+  grid.className = 'codon-grid';
+
+  pairs.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'codon-target-card';
+    card.innerHTML = `
+      <div class="amino-name">${p.amino}</div>
+      <div class="amino-abbr">${p.abbr}${p.note ? ' · ' + p.note : ''}</div>
+    `;
+    const slot = document.createElement('div');
+    slot.className = 'codon-slot';
+    slot.dataset.expectedCodon = p.codon;
+    slot.textContent = '?';
+    makeDroppable(slot, (data, s) => {
+      s.textContent = data.codon;
+      s.dataset.dropped = data.codon;
+      const orig = document.getElementById(data.cardId);
+      if (orig) orig.classList.add('placed');
+      sfxDrop();
+    });
+    card.appendChild(slot);
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+function checkLevel5() {
+  const slots = document.querySelectorAll('.codon-slot');
+  let correct = 0;
+  slots.forEach(slot => {
+    const expected = slot.dataset.expectedCodon;
+    const dropped  = slot.dataset.dropped || '';
+    if (dropped === expected) {
+      slot.style.borderColor = 'var(--accent3)';
+      slot.style.background = 'rgba(168,255,62,0.12)';
+      correct++;
+    } else if (dropped) {
+      slot.style.borderColor = 'var(--accent2)';
+      slot.style.background = 'rgba(255,107,157,0.12)';
+    }
+  });
+  return { correct, total: slots.length };
+}
+
+
+/* ============================================================
+   CHECK ANSWER (called by Check button)
+   ============================================================ */
+function checkAnswer() {
+  let result;
+  switch(STATE.level) {
+    case 1: result = checkLevel1(); break;
+    case 2: result = checkLevel2(); break;
+    case 3: result = checkLevel3(); break;
+    case 4: result = checkLevel4(); break;
+    case 5: result = checkLevel5(); break;
+    default: return;
+  }
+
+  const { correct, total } = result;
+  const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  if (correct === total) {
+    // All correct!
+    stopTimer();
+    const timeBonus = Math.round(STATE.timerVal * TEACHER.bonusTimePoints);
+    const earned    = (correct * TEACHER.pointsPerCorrect) + timeBonus;
+    STATE.score += earned;
+    if (STATE.level === 5) STATE.score += 50; // level 5 bonus
+    updateHUD();
+    sfxLevelUp();
+    launchConfetti();
+    showLevelComplete(earned, correct, total);
+  } else {
+    sfxWrong();
+    setFeedback(`${correct}/${total} correct — keep trying! 💪`, 'bad');
+  }
+}
+
+
+/* ============================================================
+   RESET LEVEL
+   ============================================================ */
+function resetLevel() {
+  stopTimer();
+  startLevel(STATE.level);
+}
+
+
+/* ============================================================
+   LEVEL COMPLETE MODAL
+   ============================================================ */
+const completeMsgs = [
+  "You matched all DNA base pairs! 🧬",
+  "Perfect complementary strand! 🎯",
+  "All DNA parts labelled correctly! 🏷️",
+  "Replication sequence mastered! 🔬",
+  "Genetic code cracked! You're a DNA expert! 🧪"
+];
+
+function showLevelComplete(earned, correct, total) {
+  document.getElementById('complete-emoji').textContent = ['🎉','🌟','🏆','🚀','🎓'][STATE.level-1];
+  document.getElementById('complete-title').textContent = `Level ${STATE.level} Complete!`;
+  document.getElementById('complete-msg').textContent   = completeMsgs[STATE.level - 1];
+  document.getElementById('complete-score').textContent = `+${earned} pts (${correct}/${total} correct)`;
+
+  const nextBtn = document.getElementById('next-level-btn');
+  if (STATE.level >= 5) {
+    nextBtn.textContent = '🎓 Get Certificate';
+    nextBtn.onclick = showCertificate;
+  } else {
+    nextBtn.textContent = `Level ${STATE.level + 1} →`;
+    nextBtn.onclick = nextLevel;
+  }
+
+  showModal('level-complete-modal');
+  STATE.completedLevels.push(STATE.level);
+  saveProgress();
+}
+
+function nextLevel() {
+  closeModal('level-complete-modal');
+  if (STATE.level < 5) startLevel(STATE.level + 1);
+  else showCertificate();
+}
+
+
+/* ============================================================
+   CONFETTI
+   ============================================================ */
+function launchConfetti() {
+  const colors = ['#00d4ff','#ff6b9d','#a8ff3e','#ffcc00','#cc88ff','#ff7b54'];
+  for (let i = 0; i < 80; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    const size = 8 + Math.random() * 10;
+    p.style.cssText = `
+      left: ${Math.random()*100}vw;
+      top: 0;
+      width: ${size}px; height: ${size * (0.5 + Math.random())}px;
+      background: ${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration: ${1.5 + Math.random()*2}s;
+      animation-delay: ${Math.random()*0.5}s;
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 3000);
+  }
+}
+
+
+/* ============================================================
+   CERTIFICATE
+   ============================================================ */
+function showCertificate() {
+  closeModal('level-complete-modal');
+  stopTimer();
+  document.getElementById('game-hud').classList.remove('visible');
+  document.getElementById('progress-bar-wrap').classList.remove('visible');
+
+  document.getElementById('cert-name').textContent  = STATE.playerName;
+  document.getElementById('cert-score').textContent = STATE.score;
+  document.getElementById('cert-date').textContent  = 'Completed on ' + new Date().toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // Badges
+  const badges = ['🧬 Base Pairing', '🔗 Strand Builder', '🏷️ DNA Labeler', '🔄 Replication Pro', '🧪 Code Cracker'];
+  const badgeContainer = document.getElementById('cert-badges');
+  badgeContainer.innerHTML = '';
+  badges.forEach(b => {
+    const el = document.createElement('div');
+    el.className = 'badge';
+    el.textContent = b;
+    badgeContainer.appendChild(el);
+  });
+
+  // Save to leaderboard
+  saveToLeaderboard(STATE.playerName, STATE.score);
+
+  showScreen('cert-screen');
+  launchConfetti();
+  setTimeout(launchConfetti, 800);
+}
+
+function printCertificate() { window.print(); }
+
+
+/* ============================================================
+   LEADERBOARD
+   ============================================================ */
+function saveToLeaderboard(name, score) {
+  try {
+    let lb = JSON.parse(localStorage.getItem('dna_leaderboard') || '[]');
+    lb.push({ name, score, date: new Date().toLocaleDateString() });
+    lb.sort((a,b) => b.score - a.score);
+    lb = lb.slice(0, 20);
+    localStorage.setItem('dna_leaderboard', JSON.stringify(lb));
+  } catch(e) {}
+}
+
+function showLeaderboard() {
+  try {
+    const lb = JSON.parse(localStorage.getItem('dna_leaderboard') || '[]');
+    const tbody = document.getElementById('lb-body');
+    tbody.innerHTML = '';
+    if (lb.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No scores yet. Play the game to get on the board!</td></tr>';
+    } else {
+      lb.forEach((entry, i) => {
+        const tr = document.createElement('tr');
+        const rankClass = i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'';
+        tr.innerHTML = `
+          <td class="${rankClass}">${['🥇','🥈','🥉'][i] || i+1}</td>
+          <td>${entry.name}</td>
+          <td style="color:var(--accent4);font-weight:700;">${entry.score}</td>
+          <td style="color:var(--muted);font-size:0.8rem;">${entry.date}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  } catch(e) {}
+  showScreen('leaderboard-screen');
+}
+
+function clearLeaderboard() {
+  if (confirm('Clear all leaderboard scores?')) {
+    localStorage.removeItem('dna_leaderboard');
+    showLeaderboard();
+  }
+}
+
+
+/* ============================================================
+   PROGRESS PERSISTENCE (localStorage)
+   ============================================================ */
+function saveProgress() {
+  try {
+    localStorage.setItem('dna_progress', JSON.stringify({
+      score: STATE.score,
+      level: STATE.level,
+      completedLevels: STATE.completedLevels,
+      playerName: STATE.playerName,
+    }));
+  } catch(e) {}
+}
+
+
+/* ============================================================
+   CUSTOM COLOUR OVERRIDES (Teacher setting)
+   ============================================================ */
+if (TEACHER.customColors) {
+  const root = document.documentElement;
+  Object.entries(TEACHER.customColors).forEach(([k,v]) => {
+    root.style.setProperty('--'+k, v);
+  });
+}
+
+
+/* ============================================================
+   TOUCH SUPPORT — Deselect card if tapping elsewhere
+   ============================================================ */
+document.addEventListener('touchend', e => {
+  if (touchSelectedCard && !e.target.closest('.drop-slot,.pair-slot,.order-slot,.codon-slot,.dna-label-target')) {
+    touchSelectedCard.style.boxShadow = '';
+    touchSelectedCard = null;
+  }
+});
+
+/* ============================================================
+   ON LOAD — Check for saved progress
+   ============================================================ */
+window.addEventListener('load', () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dna_progress') || 'null');
+    if (saved && saved.playerName) {
+      // Optionally restore (not auto-resuming, just showing start screen)
+    }
+  } catch(e) {}
+});
+</script>
+</body>
+</html>
